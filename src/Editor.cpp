@@ -1,4 +1,5 @@
 #include "Editor.h"
+#include "GameLogic.h"
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
@@ -32,10 +33,17 @@ Editor::Editor() {
   write(STDOUT_FILENO, "\e[2 q", 5);
 
   E.screenrows -= 1;
+
+  currEvent = GameLogic::GameEvent::REVERT;
 }
 
 Editor::~Editor() {
   refreshScreen();
+
+  for (int i = 0; i < E.numrows; i++) {
+    editorFreeRows(&E.row[i]);
+  }
+
   disableRawMode();
 }
 
@@ -51,6 +59,12 @@ void Editor::abAppend(struct abuf *ab, const char *s, int len) {
 
 void Editor::abFree(struct abuf *ab) { free(ab->b); }
 
+void Editor::editorFreeRows(erow *row) {
+  free(row->render);
+  free(row->chars);
+  free(row->hl);
+}
+
 int Editor::editorRowCxToRx(erow *row, int cx) {
   int rx = 0;
   int j;
@@ -63,6 +77,7 @@ int Editor::editorRowCxToRx(erow *row, int cx) {
   return rx;
 }
 
+// TODO: This should change to paginate instead of scrolling
 void Editor::editorScroll() {
   E.rx = E.cx;
   if (E.cy < E.numrows) {
@@ -83,11 +98,11 @@ void Editor::editorScroll() {
   }
 }
 
-void Editor::moveCursor(direction d) {
+void Editor::moveCursor(Direction d) {
   erow *row = (E.cy >= E.numrows) ? NULL : &E.row[E.cy];
 
   switch (d) {
-  case direction::BACKWARD:
+  case Direction::BACKWARD:
     if (E.cx > 0) {
       E.cx--;
     } else if (E.cy > 0) {
@@ -111,29 +126,59 @@ void Editor::editorDrawRows(struct abuf *ab) {
   for (y = 0; y < E.screenrows; y++) {
     int filerow = y + E.rowoff;
     if (filerow >= E.numrows && !E.numrows) {
-      abAppend(ab, "~", 1);
+      // abAppend(ab, "~", 1);
     } else {
       int len = E.row[filerow].rsize - E.coloff;
       if (len < 0)
         len = 0;
       if (len > E.screencols)
         len = E.screencols;
-      abAppend(ab, &E.row[filerow].render[E.coloff], len);
+
+      char *c = &E.row[filerow].render[E.coloff];
+      unsigned char *hl = &E.row[filerow].hl[E.coloff];
+
+      int j;
+      for (j = 0; j < len; j++) {
+        int color = editorSyntaxToColor(static_cast<Highlight>(hl[j]));
+        char buf[16];
+        int clen = snprintf(buf, sizeof(buf), "\x1b[%dm", color);
+        abAppend(ab, buf, clen);
+        abAppend(ab, &c[j], 1);
+        abAppend(ab, "\x1b[39m", 5);
+      }
+      abAppend(ab, "\x1b[39m", 5);
     }
+
     abAppend(ab, "\x1b[K", 3);
     abAppend(ab, "\r\n", 2);
   }
 }
 
+void Editor::editorHighlight() {
+  erow *currRow = (E.cy >= E.numrows) ? NULL : &E.row[E.cy];
+  if (currRow) {
+    switch (currEvent) {
+    case GameLogic::GameEvent::CORRECT:
+      currRow->hl[E.rx-1] = (unsigned char)Editor::Highlight::HL_CORRECT;
+      break;
+    case GameLogic::GameEvent::INCORRECT:
+      currRow->hl[E.rx-1] = (unsigned char)Editor::Highlight::HL_INCORRECT;
+      break;
+    default:
+      currRow->hl[E.rx] = (unsigned char)Editor::Highlight::HL_NORMAL;
+      break;
+    }
+  }
+}
+
 void Editor::refreshScreen() {
   editorScroll();
+  editorHighlight();
 
   struct abuf ab = ABUF_INIT;
 
   abAppend(&ab, "\x1b[?25l", 6);
   abAppend(&ab, "\x1b[H", 3);
-
-  // Color output
 
   editorDrawRows(&ab);
 
@@ -211,7 +256,20 @@ void Editor::enableRawMode() {
 
 char Editor::getCurrentChar() {
   erow *row = (E.cy >= E.numrows) ? NULL : &E.row[E.cy];
-  return row->chars[E.cx];
+  if (row)
+    return row->chars[E.rx];
+  return '\0';
+}
+
+int Editor::editorSyntaxToColor(Highlight hl) {
+  switch (hl) {
+  case Highlight::HL_CORRECT:
+    return 32;
+  case Highlight::HL_INCORRECT:
+    return 31;
+  default:
+    return 37;
+  }
 }
 
 void Editor::editorOpen(char *filename) {
@@ -243,6 +301,7 @@ void Editor::editorAppendRow(char *s, size_t len) {
 
   E.row[at].rsize = 0;
   E.row[at].render = NULL;
+  E.row[at].hl = NULL;
   editorUpdateRow(&E.row[at]);
 
   E.numrows++;
@@ -270,4 +329,12 @@ void Editor::editorUpdateRow(erow *row) {
   }
   row->render[idx] = '\0';
   row->rsize = idx;
+
+  editorUpdateSyntaxRow(row);
+}
+
+void Editor::editorUpdateSyntaxRow(erow *row) {
+  row->hl = (unsigned char *)realloc(row->hl, row->rsize);
+  // HL_NORMAL
+  memset(row->hl, (unsigned char)Highlight::HL_NORMAL, row->rsize);
 }

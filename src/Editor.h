@@ -3,13 +3,16 @@
 
 #include <termios.h>
 #include <stdlib.h>
+#include "GameLogic.h"
 
 class Editor {
 public:
   Editor();
   ~Editor();
 
-  enum direction {
+  GameLogic::GameEvent currEvent;
+
+  enum class Direction {
     FORWARD,
     BACKWARD
   };
@@ -17,12 +20,20 @@ public:
   char getCurrentChar();
   void editorOpen(char *filename);
   void refreshScreen();
-  void moveCursor(direction d);
+  void moveCursor(Direction d);
 
 private:
+
+  enum class Highlight: unsigned char {
+    HL_NORMAL,
+    HL_CORRECT,
+    HL_INCORRECT,
+  };
+
   typedef struct erow {
     int size;
     char* chars;
+    unsigned char* hl;
     // size of render
     int rsize;
     char* render;
@@ -56,9 +67,13 @@ private:
   void editorUpdateRow(erow *row);
   void editorScroll();
   void editorDrawRows(struct abuf *ab);
-  // MOVE AB TO DIFFERENT FILE
   void abFree(struct abuf *ab);
   void abAppend(struct abuf *ab, const char *s, int len);
+  void editorFreeRows(erow *row);
   int editorRowCxToRx(erow *row, int cx);
+  int editorSyntaxToColor(Highlight hl);
+  void editorHighlight();
+  void editorUpdateSyntaxRow(erow *row);
+  void colorCharacters(); 
 };
 #endif

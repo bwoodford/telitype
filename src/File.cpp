@@ -5,7 +5,8 @@
 
 using namespace std;
 
-File::File(char* path) {
+File::File(char* path): path(path) {
+  numrows = 0;
   load(path);
 }
 
@@ -18,21 +19,21 @@ void File::load(char* path) {
   file.open(path, ios::in);
 
   if (file.is_open()) {
-    string buff;
+    string buff = "";
 
     while (getline(file, buff)) {
-      // Add null termination character
-      buff.push_back('\0');
-
-      frow newRow = {
-        buff,
-        buff.size()
-      };
-
-      rows.push_back(newRow);
+      rows.push_back(FileRow(buff, buff.length()));
       numrows++;
     }
 
     file.close();
   }
+}
+
+vector<FileRow> File::getRows() {
+  return rows;
+}
+
+char* File::getPath() {
+  return path;
 }

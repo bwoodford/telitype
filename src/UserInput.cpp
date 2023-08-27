@@ -10,14 +10,13 @@ using namespace std;
 UserInput::UserInput() {}
 UserInput::~UserInput() {}
 
-char UserInput::processInput() {
+char UserInput::getKey() {
   char key = readKey();
   // check if user input is in ASCII range
   switch (key) {
   case CTRL_KEY('q'):
-    // Figure out a way to clean this up with a control event of some sort
     exit(0);
-    return '0';
+    break;
   default:
     return key;
   }

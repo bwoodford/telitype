@@ -7,7 +7,7 @@ class UserInput {
 public:
   UserInput();
   ~UserInput();
-  char processInput();
+  char getKey();
 
 private:
   char readKey();

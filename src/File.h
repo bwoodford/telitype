@@ -3,22 +3,22 @@
 
 #include <string>
 #include <vector>
+#include "FileRow.h"
 
 using namespace std;
 
 class File {
 public:
-  File(char* path);
+  File(char* filePath);
   ~File();
 
-  typedef struct frow {
-    string line;
-    size_t length;
-  } frow;
+  char* getPath(); 
+  vector<FileRow> getRows();
 
 private:
-  std::vector<frow> rows;
+  std::vector<FileRow> rows;
   int numrows;
+  char* path;
 
   void load(char* path);
 };

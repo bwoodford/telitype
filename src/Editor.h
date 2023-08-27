@@ -1,79 +1,61 @@
 #ifndef EDITOR_H
 #define EDITOR_H
 
-#include <termios.h>
-#include <stdlib.h>
+#include "File.h"
 #include "GameLogic.h"
+#include "Terminal.h"
+#include "iostream"
+#include <stdlib.h>
+#include <termios.h>
+#include <unistd.h>
 
 class Editor {
 public:
-  Editor();
+  Editor(File file, Terminal term);
   ~Editor();
 
-  GameLogic::GameEvent currEvent;
+  enum class Direction { FORWARD, BACKWARD };
 
-  enum class Direction {
-    FORWARD,
-    BACKWARD
-  };
-
+  void draw();
   char getCurrentChar();
-  void editorOpen(char *filename);
-  void refreshScreen();
   void moveCursor(Direction d);
 
 private:
+  File m_file;
+  Terminal m_term;
 
-  enum class Highlight: unsigned char {
-    HL_NORMAL,
-    HL_CORRECT,
-    HL_INCORRECT,
-  };
-
-  typedef struct erow {
-    int size;
-    char* chars;
-    unsigned char* hl;
-    // size of render
-    int rsize;
-    char* render;
-  } erow;
-
-  struct abuf {
-    char *b;
-    int len;
+  enum class Highlight : unsigned char {
+    HL_WHITE,
+    HL_GREEN,
+    HL_RED,
   };
 
   struct Config {
-    // index for chars field in erow
-    int cx, cy;
-    // index for render field in erow
-    int rx;
-    int screenrows;
-    int screencols;
     int coloff;
     int rowoff;
+    int windowRows;
+    int windowCols;
     int numrows;
-    erow* row;
-    struct termios orig_termios;
+    vector<FileRow> rows;
   };
 
   Config E;
-  int getWindowSize(int *rows, int *cols);
-  int getCursorPosition(int *rows, int *cols);
-  void enableRawMode();
-  void disableRawMode();
-  void editorAppendRow(char *s, size_t len);
-  void editorUpdateRow(erow *row);
-  void editorScroll();
-  void editorDrawRows(struct abuf *ab);
-  void abFree(struct abuf *ab);
-  void abAppend(struct abuf *ab, const char *s, int len);
-  void editorFreeRows(erow *row);
-  int editorRowCxToRx(erow *row, int cx);
-  int editorSyntaxToColor(Highlight hl);
-  void editorHighlight();
-  void editorUpdateSyntaxRow(erow *row);
-  void colorCharacters(); 
+
+  //void updateRow(File::FileRow row);
+  void scroll();
+
+  int syntaxToColor(Highlight hl);
+
+  void highlight();
+  void updateSyntaxRow(FileRow row);
+  void colorCharacters();
+
+
+  void setCursorColumn(int cX);
+  void setCursorRow(int cY);
+
+  int getCursorRow();
+  int getCursorColumn();
+
 };
 #endif
